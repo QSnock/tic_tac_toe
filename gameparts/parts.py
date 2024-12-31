@@ -42,7 +42,6 @@ class Board:
 
         return False
 
-
     def __str__(self):
         return (
             'Объект игрового поля размером '
