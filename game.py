@@ -1,4 +1,5 @@
 import pygame
+import sys
 
 from gameparts import Board
 
@@ -16,9 +17,23 @@ X_WIDTH = 15
 O_WIDTH = 15
 SPACE = CELL_SIZE // 4
 
+# Цвета для текста
+TEXT_COLOR = (255, 255, 255)
+BUTTON_COLOR = (52, 152, 219)
+BUTTON_HOVER_COLOR = (41, 128, 185)
+BUTTON_TEXT_COLOR = (255, 255, 255)
+
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption('Крестики-нолики')
 screen.fill(BG_COLOR)
+
+# Инициализация шрифта
+try:
+    font = pygame.font.Font(None, 36)
+    small_font = pygame.font.Font(None, 24)
+except Exception:
+    font = pygame.font.SysFont('arial', 36)
+    small_font = pygame.font.SysFont('arial', 24)
 
 
 def draw_lines():
@@ -81,51 +96,150 @@ def draw_figures(board):
                 )
 
 
+def draw_text(text, font, color, x, y):
+    text_surface = font.render(text, True, color)
+    text_rect = text_surface.get_rect(center=(x, y))
+    screen.blit(text_surface, text_rect)
+
+
+def is_point_in_button(mouse_x, mouse_y, button_x, button_y, button_width,
+                       button_height):
+    """Проверяет, находится ли точка в пределах кнопки"""
+    return (button_x <= mouse_x <= button_x + button_width and
+            button_y <= mouse_y <= button_y + button_height)
+
+
+def is_valid_move(row, col, board):
+    """Проверяет, является ли ход валидным"""
+    return (0 <= row < BOARD_SIZE and
+            0 <= col < BOARD_SIZE and
+            board[row][col] == ' ')
+
+
+def draw_button(text, x, y, width, height, hover=False):
+    color = BUTTON_HOVER_COLOR if hover else BUTTON_COLOR
+    pygame.draw.rect(screen, color, (x, y, width, height))
+    pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height), 2)
+
+    text_surface = small_font.render(text, True, BUTTON_TEXT_COLOR)
+    text_rect = text_surface.get_rect(center=(x + width // 2, y + height // 2))
+    screen.blit(text_surface, text_rect)
+
+
+def show_game_result(result):
+    """Показывает результат игры и кнопку для новой игры"""
+    screen.fill(BG_COLOR)
+
+    draw_text(result, font, TEXT_COLOR, WIDTH // 2, HEIGHT // 2 - 30)
+
+    button_x = WIDTH // 2 - 60
+    button_y = HEIGHT // 2 + 20
+    button_width = 120
+    button_height = 40
+
+    draw_button("Новая игра", button_x, button_y, button_width, button_height)
+
+    pygame.display.update()
+
+    waiting_for_click = True
+    while waiting_for_click:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = event.pos
+                if is_point_in_button(
+                    mouse_x,
+                    mouse_y,
+                    button_x,
+                    button_y,
+                    button_width,
+                    button_height
+                ):
+                    waiting_for_click = False
+                    return True
+
+            if event.type == pygame.MOUSEMOTION:
+                mouse_x, mouse_y = event.pos
+                hover = is_point_in_button(
+                    mouse_x,
+                    mouse_y,
+                    button_x,
+                    button_y,
+                    button_width,
+                    button_height
+                )
+
+                screen.fill(BG_COLOR)
+                draw_text(
+                    result, font, TEXT_COLOR, WIDTH // 2, HEIGHT // 2 - 30
+                )
+                draw_button(
+                    "Новая игра",
+                    button_x,
+                    button_y,
+                    button_width,
+                    button_height,
+                    hover
+                )
+                pygame.display.update()
+
+
 def save_result(result):
-    # Если нужно явно указать кодировку, добавьте параметр encoding='utf-8'.
     with open('result.txt', 'a', encoding='utf-8') as f:
         f.write(result + '\n')
 
 
 def main():
-    game = Board()
-    current_player = 'X'
-    running = True
-    draw_lines()
-
-    while running:
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_y = event.pos[0]
-                mouse_x = event.pos[1]
-
-                clicked_row = mouse_x // CELL_SIZE
-                clicked_col = mouse_y // CELL_SIZE
-
-                if game.board[clicked_row][clicked_col] == ' ':
-                    game.make_move(clicked_row, clicked_col, current_player)
-
-                    if game.check_win(current_player):
-                        result = f'Победили {current_player}.'
-                        print(result)
-                        save_result(result)
-                        running = False
-                    elif game.is_board_full():
-                        result = 'Ничья!'
-                        print(result)
-                        save_result(result)
-                        running = False
-
-                    current_player = 'O' if current_player == 'X' else 'X'
-                    draw_figures(game.board)
-
+    while True:
+        game = Board()
+        current_player = 'X'
+        running = True
+        screen.fill(BG_COLOR)
+        draw_lines()
         pygame.display.update()
 
-    pygame.quit()
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    mouse_y = event.pos[0]
+                    mouse_x = event.pos[1]
+
+                    clicked_row = mouse_x // CELL_SIZE
+                    clicked_col = mouse_y // CELL_SIZE
+
+                    if is_valid_move(clicked_row, clicked_col, game.board):
+                        game.make_move(
+                            clicked_row,
+                            clicked_col,
+                            current_player
+                        )
+
+                        if game.check_win(current_player):
+                            result = f'Победили {current_player}!'
+                            print(result)
+                            save_result(result)
+                            running = False
+                        elif game.is_board_full():
+                            result = 'Ничья!'
+                            print(result)
+                            save_result(result)
+                            running = False
+                        else:
+                            current_player = 'O' if current_player == 'X' else 'X'
+
+                        draw_figures(game.board)
+
+            pygame.display.update()
+
+        if not show_game_result(result):
+            break
 
 
 if __name__ == '__main__':
